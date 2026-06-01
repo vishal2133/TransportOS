@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TransportOS — Fleet Manager</title>
+  <meta name="description" content="Simple fleet management for your transport business.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Sidebar (Desktop) -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">🚛 TransportOS</div>
+      <div class="logo-sub">Fleet Manager</div>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span> Dashboard</button>
+      <button class="nav-item" onclick="navigate('trips')" id="nav-trips"><span class="nav-icon">🗺️</span> Trips</button>
+      <button class="nav-item" onclick="navigate('trucks')" id="nav-trucks"><span class="nav-icon">🚛</span> Trucks</button>
+      <button class="nav-item" onclick="navigate('drivers')" id="nav-drivers"><span class="nav-icon">👨‍✈️</span> Drivers</button>
+      <button class="nav-item" onclick="navigate('parties')" id="nav-parties"><span class="nav-icon">🏢</span> Parties</button>
+      <button class="nav-item" onclick="navigate('documents')" id="nav-documents"><span class="nav-icon">📋</span> Documents</button>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Mobile top bar -->
+    <div class="top-bar">
+      <div class="top-bar-logo">🚛 TransportOS</div>
+      <div class="top-bar-page" id="top-bar-title">Dashboard</div>
+    </div>
+
+    <!-- PAGE: DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Good day 👋</div>
+          <div class="page-subtitle" id="dashboard-date"></div>
+        </div>
+      </div>
+      <div class="page-content">
+        <div class="stats-grid" id="dashboard-stats"></div>
+        <div id="dashboard-alerts"></div>
+        <div class="section-card">
+          <div class="section-header">
+            <div class="section-title">Recent Trips</div>
+            <div class="section-action" onclick="navigate('trips')">View all →</div>
+          </div>
+          <div class="trip-list" id="recent-trips-list"></div>
+        </div>
+        <div class="section-card">
+          <div class="section-header">
+            <div class="section-title">Top Outstanding Payments</div>
+            <div class="section-action" onclick="navigate('parties')">View all →</div>
+          </div>
+          <div id="dashboard-outstanding"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAGE: TRIPS -->
+    <div class="page" id="page-trips">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Trips</div>
+          <div class="page-subtitle" id="trips-count"></div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddTrip()">+ Add Trip</button>
+      </div>
+      <div class="page-content">
+        <div class="filter-bar">
+          <input type="text" class="filter-input" id="trip-search" placeholder="🔍 Search party, route, truck..." oninput="renderTrips()" style="flex:1;min-width:160px;">
+          <select class="filter-input" id="trip-filter-status" onchange="renderTrips()">
+            <option value="">All Status</option>
+            <option value="loading">Loading</option>
+            <option value="in-transit">In Transit</option>
+            <option value="delivered">Delivered</option>
+            <option value="billed">Billed</option>
+            <option value="paid">Paid</option>
+          </select>
+          <select class="filter-input" id="trip-filter-truck" onchange="renderTrips()">
+            <option value="">All Trucks</option>
+          </select>
+        </div>
+        <div class="trip-list" id="trips-list"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: TRUCKS -->
+    <div class="page" id="page-trucks">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Trucks</div>
+          <div class="page-subtitle" id="trucks-count"></div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddTruck()">+ Add Truck</button>
+      </div>
+      <div class="page-content">
+        <div class="truck-grid" id="trucks-grid"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: DRIVERS -->
+    <div class="page" id="page-drivers">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Drivers</div>
+          <div class="page-subtitle" id="drivers-count"></div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddDriver()">+ Add Driver</button>
+      </div>
+      <div class="page-content">
+        <div class="driver-list" id="drivers-list"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: PARTIES -->
+    <div class="page" id="page-parties">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Parties</div>
+          <div class="page-subtitle" id="parties-count"></div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddParty()">+ Add Party</button>
+      </div>
+      <div class="page-content">
+        <div class="filter-bar">
+          <input type="text" class="filter-input" id="party-search" placeholder="🔍 Search party..." oninput="renderParties()" style="flex:1;">
+        </div>
+        <div class="party-list" id="parties-list"></div>
+      </div>
+    </div>
+
+    <!-- PAGE: DOCUMENTS -->
+    <div class="page" id="page-documents">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Documents</div>
+          <div class="page-subtitle">All truck document expiry status</div>
+        </div>
+        <button class="btn btn-ghost" onclick="openAddDocument()">+ Update Document</button>
+      </div>
+      <div class="page-content">
+        <div class="section-card" style="padding:0;overflow:hidden;">
+          <div class="doc-table-wrap">
+            <table class="doc-table">
+              <thead>
+                <tr>
+                  <th>Truck</th>
+                  <th>RC Book</th>
+                  <th>Insurance</th>
+                  <th>Fitness</th>
+                  <th>PUC</th>
+                  <th>Permit</th>
+                </tr>
+              </thead>
+              <tbody id="doc-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="doc-legend">
+          <span><span class="dot green"></span> Valid (&gt;30 days)</span>
+          <span><span class="dot yellow"></span> Expiring (≤30 days)</span>
+          <span><span class="dot red"></span> Expired</span>
+          <span><span class="dot gray"></span> Not entered</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Nav (Mobile) -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-items">
+      <button class="bottom-nav-item active" onclick="navigate('dashboard')" id="bnav-dashboard"><span class="icon">📊</span><span>Home</span></button>
+      <button class="bottom-nav-item" onclick="navigate('trips')" id="bnav-trips"><span class="icon">🗺️</span><span>Trips</span></button>
+      <button class="bottom-nav-item" onclick="navigate('trucks')" id="bnav-trucks"><span class="icon">🚛</span><span>Trucks</span></button>
+      <button class="bottom-nav-item" onclick="navigate('drivers')" id="bnav-drivers"><span class="icon">👨</span><span>Drivers</span></button>
+      <button class="bottom-nav-item" onclick="navigate('parties')" id="bnav-parties"><span class="icon">🏢</span><span>Parties</span></button>
+      <button class="bottom-nav-item" onclick="navigate('documents')" id="bnav-documents"><span class="icon">📋</span><span>Docs</span></button>
+    </div>
+  </nav>
+</div>
+
+<!-- MODALS -->
+<!-- Add Trip -->
+<div class="modal-overlay" id="modal-add-trip">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="trip-modal-title">Add Trip</div>
+      <button class="modal-close" onclick="closeModal('modal-add-trip')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="trip-edit-id">
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="trip-date"></div>
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-input" id="trip-status">
+            <option value="loading">Loading</option>
+            <option value="in-transit">In Transit</option>
+            <option value="delivered">Delivered</option>
+            <option value="billed">Billed</option>
+            <option value="paid">Paid</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Truck</label><select class="form-input" id="trip-truck"><option value="">Select Truck</option></select></div>
+        <div class="form-group"><label class="form-label">Driver</label><select class="form-input" id="trip-driver"><option value="">Select Driver</option></select></div>
+        <div class="form-group"><label class="form-label">Party</label><select class="form-input" id="trip-party"><option value="">Select Party</option></select></div>
+        <div class="form-group"><label class="form-label">Freight Amount (₹)</label><input type="number" class="form-input" id="trip-freight" placeholder="e.g. 15000"></div>
+        <div class="form-group"><label class="form-label">From</label><input type="text" class="form-input" id="trip-from" placeholder="e.g. Ahmedabad"></div>
+        <div class="form-group"><label class="form-label">To</label><input type="text" class="form-input" id="trip-to" placeholder="e.g. Surat"></div>
+        <div class="form-group"><label class="form-label">GST on Freight?</label>
+          <select class="form-input" id="trip-gst"><option value="no">No GST</option><option value="yes">With GST (18%)</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Amount Received (₹)</label><input type="number" class="form-input" id="trip-paid" placeholder="0"></div>
+        <div class="form-group full-width"><label class="form-label">Notes</label><input type="text" class="form-input" id="trip-notes" placeholder="Any notes..."></div>
+      </div>
+      <div class="divider"></div>
+      <div class="section-header">
+        <div class="section-title" style="font-size:14px;">Expenses</div>
+        <button class="btn btn-ghost btn-sm" onclick="addExpenseRow()">+ Add Expense</button>
+      </div>
+      <div id="expense-rows"></div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeModal('modal-add-trip')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTrip()">Save Trip</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Truck -->
+<div class="modal-overlay" id="modal-add-truck">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="truck-modal-title">Add Truck</div>
+      <button class="modal-close" onclick="closeModal('modal-add-truck')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="truck-edit-id">
+      <div class="form-grid">
+        <div class="form-group full-width"><label class="form-label">Registration Number</label><input type="text" class="form-input" id="truck-number" placeholder="e.g. GJ-05-AA-1234" style="text-transform:uppercase"></div>
+        <div class="form-group"><label class="form-label">Make / Model</label><input type="text" class="form-input" id="truck-model" placeholder="e.g. Tata 407"></div>
+        <div class="form-group"><label class="form-label">Year</label><input type="number" class="form-input" id="truck-year" placeholder="e.g. 2019"></div>
+        <div class="form-group"><label class="form-label">Owner Name</label><input type="text" class="form-input" id="truck-owner" placeholder="e.g. Ramesh Kumar"></div>
+        <div class="form-group"><label class="form-label">Truck Type</label>
+          <select class="form-input" id="truck-type">
+            <option>Mini Truck</option><option>LCV</option><option>HCV</option><option>Trailer</option><option>Tanker</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeModal('modal-add-truck')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveTruck()">Save Truck</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Driver -->
+<div class="modal-overlay" id="modal-add-driver">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="driver-modal-title">Add Driver</div>
+      <button class="modal-close" onclick="closeModal('modal-add-driver')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="driver-edit-id">
+      <div class="form-grid">
+        <div class="form-group full-width"><label class="form-label">Full Name</label><input type="text" class="form-input" id="driver-name" placeholder="e.g. Raju Sharma"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-input" id="driver-phone" placeholder="98765 43210"></div>
+        <div class="form-group"><label class="form-label">License Number</label><input type="text" class="form-input" id="driver-license" placeholder="GJ0120190012345"></div>
+        <div class="form-group"><label class="form-label">Joining Date</label><input type="date" class="form-input" id="driver-joining"></div>
+        <div class="form-group"><label class="form-label">Monthly Salary (₹)</label><input type="number" class="form-input" id="driver-salary" placeholder="18000"></div>
+        <div class="form-group full-width"><label class="form-label">Address / Notes</label><input type="text" class="form-input" id="driver-address" placeholder="Village, District"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeModal('modal-add-driver')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveDriver()">Save Driver</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Party -->
+<div class="modal-overlay" id="modal-add-party">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="party-modal-title">Add Party</div>
+      <button class="modal-close" onclick="closeModal('modal-add-party')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="party-edit-id">
+      <div class="form-grid">
+        <div class="form-group full-width"><label class="form-label">Company / Party Name</label><input type="text" class="form-input" id="party-name" placeholder="e.g. Patel Cement Works"></div>
+        <div class="form-group"><label class="form-label">Contact Person</label><input type="text" class="form-input" id="party-contact" placeholder="Mahesh Patel"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-input" id="party-phone" placeholder="98765 43210"></div>
+        <div class="form-group"><label class="form-label">Payment Type</label>
+          <select class="form-input" id="party-payment-type"><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="neft">NEFT / Bank</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Credit Terms</label>
+          <select class="form-input" id="party-payment-terms">
+            <option value="immediate">Immediate</option><option value="7days">7 Days</option><option value="15days">15 Days</option><option value="30days">30 Days</option><option value="45days">45 Days</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">GST Number</label><input type="text" class="form-input" id="party-gst" placeholder="27AABCU9603R1ZX"></div>
+        <div class="form-group full-width"><label class="form-label">Address</label><input type="text" class="form-input" id="party-address" placeholder="City, State"></div>
+        <div class="form-group full-width"><label class="form-label">Notes / Terms</label><input type="text" class="form-input" id="party-notes" placeholder="e.g. Cash only, 10% discount"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeModal('modal-add-party')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveParty()">Save Party</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Document -->
+<div class="modal-overlay" id="modal-add-document">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Update Document</div>
+      <button class="modal-close" onclick="closeModal('modal-add-document')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full-width"><label class="form-label">Select Truck</label><select class="form-input" id="doc-truck"><option value="">Select Truck</option></select></div>
+        <div class="form-group"><label class="form-label">Document Type</label>
+          <select class="form-input" id="doc-type">
+            <option value="rc">RC Book</option><option value="insurance">Insurance</option><option value="fitness">Fitness Certificate</option><option value="puc">PUC Certificate</option><option value="permit">Permit</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Expiry Date</label><input type="date" class="form-input" id="doc-expiry"></div>
+        <div class="form-group full-width"><label class="form-label">Document Number (optional)</label><input type="text" class="form-input" id="doc-number" placeholder="e.g. MH-12-2024-123"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeModal('modal-add-document')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveDocument()">Save Document</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Driver Advance -->
+<div class="modal-overlay" id="modal-add-advance">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Record Transaction</div>
+      <button class="modal-close" onclick="closeModal('modal-add-advance')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="advance-driver-id">
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-input" id="advance-date"></div>
+        <div class="form-group"><label class="form-label">Type</label>
+          <select class="form-input" id="advance-type">
+            <option value="advance">Advance Given</option><option value="salary">Salary Paid</option><option value="repayment">Repayment Received</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Amount (₹)</label><input type="number" class="form-input" id="advance-amount" placeholder="0"></div>
+        <div class="form-group"><label class="form-label">Reason / Note</label><input type="text" class="form-input" id="advance-reason" placeholder="e.g. Monthly salary"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeModal('modal-add-advance')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAdvance()">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail Panel -->
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetailOnBg(event)">
+  <div class="detail-panel" id="detail-panel">
+    <div class="detail-header">
+      <div class="detail-title" id="detail-title">Details</div>
+      <div class="detail-actions">
+        <button class="btn btn-ghost btn-sm" id="detail-edit-btn" onclick="handleDetailEdit()" style="display:none">✏️ Edit</button>
+        <button class="btn btn-danger btn-sm" id="detail-delete-btn" onclick="handleDetailDelete()" style="display:none">🗑️</button>
+        <button class="modal-close" onclick="closeDetail()">✕</button>
+      </div>
+    </div>
+    <div class="detail-body" id="detail-body"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
