@@ -14,8 +14,8 @@ import Overheads from './pages/Overheads';
 
 // ── Company Settings (localStorage) ──────────────────────────────────────────
 const DEFAULT_COMPANY_PROFILES = {
-  gst: { name: 'Vijay Roadlines', phone: '', address: '', gstin: '' },
-  nonGst: { name: 'Vijay Transport Services', phone: '', address: '', gstin: '' }
+  gst: { name: 'Vijay Roadlines', phone: '', address: '', gstin: '', bankName: '', bankBranch: '', bankAccount: '', bankIfsc: '' },
+  nonGst: { name: 'Vijay Transport Services', phone: '', address: '', gstin: '', bankName: '', bankBranch: '', bankAccount: '', bankIfsc: '' }
 };
 const loadCompanyProfiles = () => {
   try {
@@ -84,7 +84,26 @@ function CompanySetupModal({ companyProfiles, onSave, onClose }) {
             </div>
             <div className="form-group full-width">
               <label className="form-label">Address</label>
-              <input name="address" value={form[activeTab].address} onChange={handle} className="form-input" placeholder="City, State" />
+              <input name="address" value={form[activeTab].address} onChange={handle} className="form-input" placeholder="A/201, VK Tower, OPP JP Nagar..." />
+            </div>
+            <div className="form-group full-width" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+              <label className="form-label" style={{ color: 'var(--accent)', fontWeight: 700 }}>Bank Details (for PDF Footer)</label>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Bank Name</label>
+              <input name="bankName" value={form[activeTab].bankName || ''} onChange={handle} className="form-input" placeholder="e.g. ICICI BANK" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Bank Branch</label>
+              <input name="bankBranch" value={form[activeTab].bankBranch || ''} onChange={handle} className="form-input" placeholder="e.g. VASAI (E), SATIVALI" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Account Number</label>
+              <input name="bankAccount" value={form[activeTab].bankAccount || ''} onChange={handle} className="form-input" placeholder="e.g. 768605000885" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">IFSC Code</label>
+              <input name="bankIfsc" value={form[activeTab].bankIfsc || ''} onChange={handle} className="form-input" placeholder="e.g. ICIC0007686" />
             </div>
           </div>
           <div className="form-actions" style={{ marginTop: '24px' }}>

@@ -13,6 +13,20 @@ const fmtDate = (d) => {
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+const numberToWords = (num) => {
+  const a = ['','One ','Two ','Three ','Four ', 'Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
+  const b = ['', '', 'Twenty','Thirty','Forty','Fifty', 'Sixty','Seventy','Eighty','Ninety'];
+  if ((num = num.toString()).length > 9) return 'overflow';
+  let n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+  if (!n) return ''; let str = '';
+  str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
+  str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
+  str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
+  str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';
+  str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) + 'Only' : '';
+  return str.trim() || 'Zero';
+};
+
 export default function Parties({ data, refreshData, companyProfiles }) {
   // ── Modal State ──
   const [showModal, setShowModal] = useState(false);
@@ -25,6 +39,8 @@ export default function Parties({ data, refreshData, companyProfiles }) {
   const [pdfParty, setPdfParty] = useState(null);
   const [pdfFrom, setPdfFrom] = useState('');
   const [pdfTo, setPdfTo] = useState('');
+  const [pdfTaxType, setPdfTaxType] = useState('cgst_sgst'); // 'cgst_sgst' or 'igst'
+  const [pdfPayableBy, setPdfPayableBy] = useState('consignor'); // 'consignor', 'consignee', 'transporter'
 
   // ── Ledger / Detail Panel State ──
   const [activeParty, setActiveParty] = useState(null);
@@ -232,21 +248,21 @@ export default function Parties({ data, refreshData, companyProfiles }) {
         return [
           i + 1,
           t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—',
-          `${t.from || '?'} → ${t.to || '?'}`,
+          `${t.from || '?'} -> ${t.to || '?'}`,
           truckNum,
-          `₹${freight.toLocaleString('en-IN')}`,
+          `Rs. ${freight.toLocaleString('en-IN')}`,
           `${gstRate}%`,
-          `₹${gstAmt.toLocaleString('en-IN')}`,
-          `₹${total.toLocaleString('en-IN')}`,
+          `Rs. ${gstAmt.toLocaleString('en-IN')}`,
+          `Rs. ${total.toLocaleString('en-IN')}`,
         ];
       } else {
         return [
           i + 1,
           t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—',
-          `${t.from || '?'} → ${t.to || '?'}`,
+          `${t.from || '?'} -> ${t.to || '?'}`,
           truckNum,
-          `₹${freight.toLocaleString('en-IN')}`,
-          `₹${total.toLocaleString('en-IN')}`,
+          `Rs. ${freight.toLocaleString('en-IN')}`,
+          `Rs. ${total.toLocaleString('en-IN')}`,
         ];
       }
     });
@@ -261,19 +277,19 @@ export default function Parties({ data, refreshData, companyProfiles }) {
     grandTotal = totalFreight + totalGst;
 
     const headRow = showGst 
-      ? [['#', 'Date', 'Route', 'Truck', 'Freight (₹)', 'GST %', 'GST Amt', 'Total (₹)']]
-      : [['#', 'Date', 'Route', 'Truck', 'Freight (₹)', 'Total (₹)']];
+      ? [['#', 'Date', 'Route', 'Truck', 'Freight (Rs.)', 'GST %', 'GST Amt', 'Total (Rs.)']]
+      : [['#', 'Date', 'Route', 'Truck', 'Freight (Rs.)', 'Total (Rs.)']];
       
     const colStyles = showGst
       ? {
-        0: { cellWidth: 8 }, 1: { cellWidth: 18 }, 2: { cellWidth: 45 },
-        3: { cellWidth: 20 }, 4: { cellWidth: 22, halign: 'right' },
-        5: { cellWidth: 12, halign: 'center' }, 6: { cellWidth: 22, halign: 'right' }, 7: { cellWidth: 24, halign: 'right' },
+        0: { cellWidth: 8 }, 1: { cellWidth: 16 }, 2: { cellWidth: 58 },
+        3: { cellWidth: 25 }, 4: { cellWidth: 20, halign: 'right' },
+        5: { cellWidth: 12, halign: 'center' }, 6: { cellWidth: 20, halign: 'right' }, 7: { cellWidth: 23, halign: 'right' },
       }
       : {
-        0: { cellWidth: 10 }, 1: { cellWidth: 22 }, 2: { cellWidth: 55 },
-        3: { cellWidth: 30 }, 4: { cellWidth: 28, halign: 'right' },
-        5: { cellWidth: 28, halign: 'right' }
+        0: { cellWidth: 10 }, 1: { cellWidth: 22 }, 2: { cellWidth: 70 },
+        3: { cellWidth: 30 }, 4: { cellWidth: 25, halign: 'right' },
+        5: { cellWidth: 25, halign: 'right' }
       };
 
     autoTable(doc, {
@@ -288,33 +304,100 @@ export default function Parties({ data, refreshData, companyProfiles }) {
       margin: { left: 14, right: 14 },
     });
 
-    const finalY = doc.lastAutoTable.finalY + 6;
-
-    // ── Footer Totals ──
-    doc.setFillColor(248, 246, 255);
-    doc.roundedRect(pageW - 80, finalY, 66, showGst ? 28 : 20, 2, 2, 'F');
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
-    
+    // ── Footer Totals & Extra ──
     if (showGst) {
-      doc.text('Total Freight:', pageW - 78, finalY + 7);
-      doc.text(`₹${totalFreight.toLocaleString('en-IN')}`, pageW - 16, finalY + 7, { align: 'right' });
-      doc.text('Total GST:', pageW - 78, finalY + 13);
-      doc.text(`₹${totalGst.toLocaleString('en-IN')}`, pageW - 16, finalY + 13, { align: 'right' });
       doc.setDrawColor(139, 92, 246); doc.setLineWidth(0.3);
-      doc.line(pageW - 78, finalY + 15, pageW - 16, finalY + 15);
-      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
-      doc.text('Grand Total:', pageW - 78, finalY + 22);
-      doc.setTextColor(139, 92, 246);
-      doc.text(`₹${grandTotal.toLocaleString('en-IN')}`, pageW - 16, finalY + 22, { align: 'right' });
+      const footerH = 38;
+      doc.rect(14, finalY, pageW - 28, footerH);
+      
+      const midX = pageW - 75;
+      doc.line(midX, finalY, midX, finalY + 30);
+      doc.line(14, finalY + 18, midX, finalY + 18);
+      doc.line(14, finalY + 30, pageW - 14, finalY + 30);
+      
+      // Bank Details
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(220, 38, 38);
+      doc.text(`Bank Name : ${co.bankName || ''}`, 16, finalY + 5);
+      doc.text(`Bank Branch : ${co.bankBranch || ''}`, 16, finalY + 9);
+      doc.text(`A/C No.: ${co.bankAccount || ''}`, 16, finalY + 13);
+      doc.text(`IFSC CODE.: ${co.bankIfsc || ''}`, 16, finalY + 17);
+
+      // Amount in words
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30);
+      doc.text('Rs. In Words:', 16, finalY + 23);
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40);
+      const words = numberToWords(Math.round(grandTotal));
+      doc.text(words, 38, finalY + 23, { maxWidth: midX - 42 });
+      
+      // Totals
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 30, 30); doc.setFontSize(8);
+      doc.text('TAXABLE VALUE', midX + 2, finalY + 4.5);
+      doc.text(totalFreight.toLocaleString('en-IN'), pageW - 16, finalY + 4.5, { align: 'right' });
+      doc.line(midX, finalY + 6, pageW - 14, finalY + 6);
+      
+      if (pdfTaxType === 'cgst_sgst') {
+        const halfGst = totalGst / 2;
+        doc.text('CGST @ 9% +', midX + 2, finalY + 10.5);
+        doc.text(halfGst.toLocaleString('en-IN'), pageW - 16, finalY + 10.5, { align: 'right' });
+        doc.line(midX, finalY + 12, pageW - 14, finalY + 12);
+        
+        doc.text('SGST @ 9% +', midX + 2, finalY + 16.5);
+        doc.text(halfGst.toLocaleString('en-IN'), pageW - 16, finalY + 16.5, { align: 'right' });
+        doc.line(midX, finalY + 18, pageW - 14, finalY + 18);
+        
+        doc.text('IGST @ %', midX + 2, finalY + 22.5);
+        doc.line(midX, finalY + 24, pageW - 14, finalY + 24);
+      } else {
+        doc.text('CGST @ 9% +', midX + 2, finalY + 10.5);
+        doc.line(midX, finalY + 12, pageW - 14, finalY + 12);
+        
+        doc.text('SGST @ 9% +', midX + 2, finalY + 16.5);
+        doc.line(midX, finalY + 18, pageW - 14, finalY + 18);
+        
+        doc.text('IGST @ 18% +', midX + 2, finalY + 22.5);
+        doc.text(totalGst.toLocaleString('en-IN'), pageW - 16, finalY + 22.5, { align: 'right' });
+        doc.line(midX, finalY + 24, pageW - 14, finalY + 24);
+      }
+
+      doc.text('TOTAL INVOICE VALUE', midX + 2, finalY + 28.5);
+      doc.text(grandTotal.toLocaleString('en-IN'), pageW - 16, finalY + 28.5, { align: 'right' });
+
+      // Signatory
+      doc.setFontSize(10); doc.setTextColor(220, 38, 38);
+      doc.text(`GSTIN: ${co.gstin || ''}`, 16, finalY + 35);
+      doc.text(`For ${co.name ? co.name.toUpperCase() : 'COMPANY'}`, pageW - 16, finalY + 35, { align: 'right' });
+      
     } else {
+      doc.setFillColor(248, 246, 255);
+      doc.roundedRect(pageW - 80, finalY, 66, 20, 2, 2, 'F');
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+      
       doc.text('Total Freight:', pageW - 78, finalY + 7);
-      doc.text(`₹${totalFreight.toLocaleString('en-IN')}`, pageW - 16, finalY + 7, { align: 'right' });
+      doc.text(`Rs. ${totalFreight.toLocaleString('en-IN')}`, pageW - 16, finalY + 7, { align: 'right' });
       doc.setDrawColor(139, 92, 246); doc.setLineWidth(0.3);
       doc.line(pageW - 78, finalY + 9, pageW - 16, finalY + 9);
       doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
       doc.text('Grand Total:', pageW - 78, finalY + 15);
       doc.setTextColor(139, 92, 246);
-      doc.text(`₹${grandTotal.toLocaleString('en-IN')}`, pageW - 16, finalY + 15, { align: 'right' });
+      doc.text(`Rs. ${grandTotal.toLocaleString('en-IN')}`, pageW - 16, finalY + 15, { align: 'right' });
+
+      let yOffset = finalY + 26;
+      if (co.bankName) {
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(30, 30, 30);
+        doc.text('Bank Details:', 14, yOffset);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${co.bankName}, ${co.bankBranch}`, 14, yOffset + 5);
+        doc.text(`A/C: ${co.bankAccount}  |  IFSC: ${co.bankIfsc}`, 14, yOffset + 10);
+        yOffset += 18;
+      }
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
+      doc.text('GST Payable by', 14, yOffset);
+      
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      doc.text(`Consignor  [ ${pdfPayableBy === 'consignor' ? 'X' : ' '} ]`, 14, yOffset + 7);
+      doc.text(`Consignee  [ ${pdfPayableBy === 'consignee' ? 'X' : ' '} ]`, 54, yOffset + 7);
+      doc.text(`Transporter  [ ${pdfPayableBy === 'transporter' ? 'X' : ' '} ]`, 94, yOffset + 7);
     }
 
     // ── Terms ──
@@ -372,13 +455,11 @@ export default function Parties({ data, refreshData, companyProfiles }) {
         </div>
       )}
 
-      <div style={{ marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
         <BillAsDropdown partyId={party.id} currentType={partyBilling[party.id]} onChange={updatePartyBilling} />
-      </div>
-      
-      {/* Click overlay indicator */}
-      <div style={{ position: 'absolute', bottom: '16px', right: '16px', color: 'var(--accent)', fontSize: '12px', fontWeight: 600, opacity: 0.8 }}>
-        View Ledger →
+        <div style={{ color: 'var(--accent)', fontSize: '12px', fontWeight: 600, opacity: 0.8 }}>
+          View Ledger →
+        </div>
       </div>
     </div>
   );
@@ -622,7 +703,42 @@ export default function Parties({ data, refreshData, companyProfiles }) {
                   <input type="date" className="form-input" value={pdfTo} onChange={e => setPdfTo(e.target.value)} />
                 </div>
               </div>
-              <div className="form-actions">
+
+              {partyBilling[pdfParty.id] === 'gst' || (!partyBilling[pdfParty.id] && pdfParty.gst) ? (
+                <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                  <label className="form-label" style={{ marginBottom: '8px' }}>Tax Type</label>
+                  <div style={{ display: 'flex', gap: '16px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input type="radio" name="taxType" checked={pdfTaxType === 'cgst_sgst'} onChange={() => setPdfTaxType('cgst_sgst')} />
+                      CGST (9%) & SGST (9%)
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input type="radio" name="taxType" checked={pdfTaxType === 'igst'} onChange={() => setPdfTaxType('igst')} />
+                      IGST (18%)
+                    </label>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: '16px', padding: '12px', background: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                  <label className="form-label" style={{ marginBottom: '8px' }}>GST Payable by</label>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input type="radio" name="payableBy" checked={pdfPayableBy === 'consignor'} onChange={() => setPdfPayableBy('consignor')} />
+                      Consignor
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input type="radio" name="payableBy" checked={pdfPayableBy === 'consignee'} onChange={() => setPdfPayableBy('consignee')} />
+                      Consignee
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                      <input type="radio" name="payableBy" checked={pdfPayableBy === 'transporter'} onChange={() => setPdfPayableBy('transporter')} />
+                      Transporter
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              <div className="form-actions" style={{ marginTop: '24px' }}>
                 <button className="btn btn-ghost" onClick={() => setPdfParty(null)}>Cancel</button>
                 <button className="btn btn-primary" style={{ background: '#16a34a' }} onClick={handleGeneratePDF}>
                   ⬇ Download PDF
