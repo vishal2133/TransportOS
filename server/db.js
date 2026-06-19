@@ -81,6 +81,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 amount REAL,
                 reason TEXT
             )`);
+
+            // Overheads & Extras
+            db.run(`CREATE TABLE IF NOT EXISTS overheads (
+                id TEXT PRIMARY KEY,
+                date TEXT NOT NULL,
+                category TEXT NOT NULL,
+                amount REAL NOT NULL,
+                notes TEXT
+            )`);
         });
     }
 });

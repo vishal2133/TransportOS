@@ -30,4 +30,11 @@ export const api = {
   addDocument: (data) => fetch(`${API_BASE}/documents`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(res => res.json()),
   updateDocument: (id, data) => fetch(`${API_BASE}/documents/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(res => res.json()),
   deleteDocument: (id) => fetch(`${API_BASE}/documents/${id}`, { method: 'DELETE' }).then(res => res.json()),
+
+  // Overheads
+  getOverheads: () => fetch(`${API_BASE}/overheads`).then(res => res.json()),
+  addOverhead: (data) => fetch(`${API_BASE}/overheads`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(res => res.json()),
+  updateOverhead: (id, data) => fetch(`${API_BASE}/overheads/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(res => res.json()),
+  deleteOverhead: (id) => fetch(`${API_BASE}/overheads/${id}`, { method: 'DELETE' }).then(res => res.json()),
 };
+

@@ -330,6 +330,8 @@ export default function Trips({ data, refreshData }) {
   // 'list' | 'daily' | 'monthly'
   const [mode, setMode] = useState('list');
   const [selectedTrips, setSelectedTrips] = useState(new Set());
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   // ── Single-trip modal ──
   const [showModal, setShowModal]   = useState(false);
@@ -987,12 +989,16 @@ export default function Trips({ data, refreshData }) {
             onClick={() => { setStickyDate(todayISO()); setBulkRows([makeRow(todayISO())]); setMode('monthly'); }}>
             📅 Monthly Register
           </button>
-          {data.trips && data.trips.length > 0 && (
+          <button className="btn btn-ghost" style={{ border: '1px solid var(--border)' }}
+            onClick={() => { setIsMultiSelect(!isMultiSelect); if(isMultiSelect) setSelectedTrips(new Set()); }}>
+            {isMultiSelect ? 'Cancel Multi-select' : '☑ Multi-select'}
+          </button>
+          {isMultiSelect && data.trips && data.trips.length > 0 && (
             <button className="btn btn-ghost" style={{ border: '1px solid var(--border)' }} onClick={handleSelectAll}>
               {selectedTrips.size === data.trips.length ? 'Deselect All' : 'Select All'}
             </button>
           )}
-          {selectedTrips.size > 0 && (
+          {isMultiSelect && selectedTrips.size > 0 && (
             <>
               <select className="form-input" style={{ width: '140px', padding: '6px 10px', fontSize: '13px', background: 'var(--bg-panel)' }}
                 onChange={(e) => {
@@ -1069,16 +1075,18 @@ export default function Trips({ data, refreshData }) {
                     return (
                       <div key={trip.id} className={`list-item ${incomplete ? 'trip-incomplete' : ''}`}
                         style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', borderBottom: i < trips.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <input type="checkbox"
-                          checked={selectedTrips.has(trip.id)}
-                          onChange={(e) => {
-                            const newSet = new Set(selectedTrips);
-                            if (e.target.checked) newSet.add(trip.id);
-                            else newSet.delete(trip.id);
-                            setSelectedTrips(newSet);
-                          }}
-                          style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--accent)' }}
-                        />
+                        {isMultiSelect && (
+                          <input type="checkbox"
+                            checked={selectedTrips.has(trip.id)}
+                            onChange={(e) => {
+                              const newSet = new Set(selectedTrips);
+                              if (e.target.checked) newSet.add(trip.id);
+                              else newSet.delete(trip.id);
+                              setSelectedTrips(newSet);
+                            }}
+                            style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--accent)' }}
+                          />
+                        )}
                         <div className="li-left" style={{ flex: '1 1 260px' }}>
                           <div className="li-icon" style={{ background: incomplete ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.08)', color: incomplete ? 'var(--yellow)' : 'var(--accent)' }}>
                             {incomplete ? '⚠️' : '🛣️'}
@@ -1104,16 +1112,19 @@ export default function Trips({ data, refreshData }) {
                           {hasGst && freightVal > 0 && <div style={{fontSize: '11px', color: 'var(--accent)', fontWeight: 700, marginBottom: '4px'}}>+18% GST</div>}
                           <div className={`badge ${trip.status}`}>{trip.status}</div>
                         </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          {incomplete && (
-                            <button className="btn btn-sm" onClick={() => openEdit(trip)}
-                              style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--yellow)', border: '1px solid rgba(245,158,11,0.3)', fontWeight: 700 }}>
-                              ✏️ Fill Details
-                            </button>
+                        <div style={{ position: 'relative' }}>
+                          <button className="btn btn-sm btn-ghost" style={{ padding: '2px 8px', fontSize: 18, fontWeight: 'bold' }}
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === trip.id ? null : trip.id); }}>⋮</button>
+                          {openMenuId === trip.id && (
+                            <div style={{ position: 'absolute', top: '100%', right: 0, background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', zIndex: 10, padding: 4, display: 'flex', flexDirection: 'column', minWidth: 100 }}>
+                              {incomplete && (
+                                <button className="btn btn-sm btn-ghost" style={{ textAlign: 'left', width: '100%', color: 'var(--yellow)' }} onClick={() => { setOpenMenuId(null); openEdit(trip); }}>Fill Details</button>
+                              )}
+                              <button className="btn btn-sm btn-ghost" style={{ textAlign: 'left', width: '100%' }} onClick={() => { setOpenMenuId(null); openDuplicate(trip); }}>Copy</button>
+                              <button className="btn btn-sm btn-ghost" style={{ textAlign: 'left', width: '100%' }} onClick={() => { setOpenMenuId(null); openEdit(trip); }}>Edit</button>
+                              <button className="btn btn-sm btn-ghost" style={{ textAlign: 'left', width: '100%', color: 'var(--red)' }} onClick={() => { setOpenMenuId(null); handleDelete(trip.id); }}>Delete</button>
+                            </div>
                           )}
-                          <button className="btn btn-sm btn-ghost" onClick={() => openDuplicate(trip)}>Copy</button>
-                          <button className="btn btn-sm btn-ghost" onClick={() => openEdit(trip)}>Edit</button>
-                          <button className="btn btn-sm btn-danger" onClick={() => handleDelete(trip.id)}>✕</button>
                         </div>
                       </div>
                     );

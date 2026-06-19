@@ -1,5 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { api } from '../api';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const toISO = (d) => d.toISOString().split('T')[0];
 const todayISO = () => toISO(new Date());
@@ -9,7 +11,9 @@ const fmtDate = (d) => {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-export default function Parties({ data, refreshData }) {
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+export default function Parties({ data, refreshData, companyProfiles }) {
   // ── Modal State ──
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -17,10 +21,44 @@ export default function Parties({ data, refreshData }) {
   const [loading, setLoading] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null);
 
+  // ── PDF Generator State ──
+  const [pdfParty, setPdfParty] = useState(null);
+  const [pdfFrom, setPdfFrom] = useState('');
+  const [pdfTo, setPdfTo] = useState('');
+
   // ── Ledger / Detail Panel State ──
   const [activeParty, setActiveParty] = useState(null);
   const [settleDate, setSettleDate] = useState(todayISO());
   const [settling, setSettling] = useState(false);
+
+  // ── Party Billing State ──
+  const [partyBilling, setPartyBilling] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('tos_party_billing') || '{}'); }
+    catch { return {}; }
+  });
+
+  // Auto-assign billing types for new parties
+  React.useEffect(() => {
+    if (!data.parties || data.parties.length === 0) return;
+    let changed = false;
+    const newBilling = { ...partyBilling };
+    data.parties.forEach(p => {
+      if (!newBilling[p.id]) {
+        newBilling[p.id] = (p.gst && p.gst.trim() !== '') ? 'gst' : 'nonGst';
+        changed = true;
+      }
+    });
+    if (changed) {
+      setPartyBilling(newBilling);
+      localStorage.setItem('tos_party_billing', JSON.stringify(newBilling));
+    }
+  }, [data.parties]);
+
+  const updatePartyBilling = (partyId, type) => {
+    const newBilling = { ...partyBilling, [partyId]: type };
+    setPartyBilling(newBilling);
+    localStorage.setItem('tos_party_billing', JSON.stringify(newBilling));
+  };
 
   // ── Derived Data ──
   const gstParties = (data.parties || []).filter(p => p.gst && p.gst.trim() !== '');
@@ -132,11 +170,181 @@ export default function Parties({ data, refreshData }) {
     }
   };
 
-  // ── Render Helpers ──
+  // ── PDF Generation ──
+  const handleGeneratePDF = () => {
+    if (!pdfFrom || !pdfTo) { alert('Please select both From and To dates.'); return; }
+    const trips = (data.trips || []).filter(t => t.partyId === pdfParty.id && t.date >= pdfFrom && t.date <= pdfTo)
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    if (trips.length === 0) { alert('No trips found in this date range for this party.'); return; }
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const billingType = partyBilling[pdfParty.id] || ((pdfParty.gst && pdfParty.gst.trim() !== '') ? 'gst' : 'nonGst');
+    const cp = companyProfiles || { gst: {}, nonGst: {} };
+    const co = billingType === 'gst' ? cp.gst : cp.nonGst;
+    const coName = co.name || 'Transport Company';
+
+    // ── Header ──
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(30, 30, 30);
+    doc.text(coName, pageW / 2, 18, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    if (co.address) doc.text(co.address, pageW / 2, 24, { align: 'center' });
+    const contactLine = [co.phone ? `Ph: ${co.phone}` : '', co.gstin ? `GSTIN: ${co.gstin}` : ''].filter(Boolean).join('   |   ');
+    if (contactLine) doc.text(contactLine, pageW / 2, 29, { align: 'center' });
+
+    // ── Divider ──
+    doc.setDrawColor(139, 92, 246);
+    doc.setLineWidth(0.8);
+    doc.line(14, 33, pageW - 14, 33);
+
+    // ── Title ──
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(30, 30, 30);
+    doc.text('FREIGHT STATEMENT', pageW / 2, 40, { align: 'center' });
+
+    // ── Party & Date info ──
+    const fromDate = new Date(pdfFrom + 'T00:00:00');
+    const toDate = new Date(pdfTo + 'T00:00:00');
+    const fmtD = (d) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.text(`To: ${pdfParty.name}`, 14, 48);
+    if (pdfParty.gst) doc.text(`GST: ${pdfParty.gst}`, 14, 53);
+    doc.text(`Period: ${fmtD(fromDate)} — ${fmtD(toDate)}`, pageW - 14, 48, { align: 'right' });
+    doc.text(`Generated: ${fmtD(new Date())}`, pageW - 14, 53, { align: 'right' });
+
+    // ── Table ──
+    const showGst = billingType === 'gst';
+    const rows = trips.map((t, i) => {
+      const freight = Number(t.freight || 0);
+      const gstRate = showGst ? 18 : 0;
+      const gstAmt = freight * (gstRate / 100);
+      const total = freight + gstAmt;
+      const truckNum = (data.trucks || []).find(tr => tr.id === t.truckId)?.number || 'N/A';
+      if (showGst) {
+        return [
+          i + 1,
+          t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—',
+          `${t.from || '?'} → ${t.to || '?'}`,
+          truckNum,
+          `₹${freight.toLocaleString('en-IN')}`,
+          `${gstRate}%`,
+          `₹${gstAmt.toLocaleString('en-IN')}`,
+          `₹${total.toLocaleString('en-IN')}`,
+        ];
+      } else {
+        return [
+          i + 1,
+          t.date ? new Date(t.date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—',
+          `${t.from || '?'} → ${t.to || '?'}`,
+          truckNum,
+          `₹${freight.toLocaleString('en-IN')}`,
+          `₹${total.toLocaleString('en-IN')}`,
+        ];
+      }
+    });
+
+    let totalFreight = 0, totalGst = 0, grandTotal = 0;
+    trips.forEach(t => {
+      const freight = Number(t.freight || 0);
+      const gstRate = showGst ? 18 : 0;
+      totalFreight += freight;
+      totalGst += freight * (gstRate / 100);
+    });
+    grandTotal = totalFreight + totalGst;
+
+    const headRow = showGst 
+      ? [['#', 'Date', 'Route', 'Truck', 'Freight (₹)', 'GST %', 'GST Amt', 'Total (₹)']]
+      : [['#', 'Date', 'Route', 'Truck', 'Freight (₹)', 'Total (₹)']];
+      
+    const colStyles = showGst
+      ? {
+        0: { cellWidth: 8 }, 1: { cellWidth: 18 }, 2: { cellWidth: 45 },
+        3: { cellWidth: 20 }, 4: { cellWidth: 22, halign: 'right' },
+        5: { cellWidth: 12, halign: 'center' }, 6: { cellWidth: 22, halign: 'right' }, 7: { cellWidth: 24, halign: 'right' },
+      }
+      : {
+        0: { cellWidth: 10 }, 1: { cellWidth: 22 }, 2: { cellWidth: 55 },
+        3: { cellWidth: 30 }, 4: { cellWidth: 28, halign: 'right' },
+        5: { cellWidth: 28, halign: 'right' }
+      };
+
+    autoTable(doc, {
+      startY: 58,
+      head: headRow,
+      body: rows,
+      theme: 'grid',
+      headStyles: { fillColor: [139, 92, 246], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: [40, 40, 40] },
+      alternateRowStyles: { fillColor: [248, 246, 255] },
+      columnStyles: colStyles,
+      margin: { left: 14, right: 14 },
+    });
+
+    const finalY = doc.lastAutoTable.finalY + 6;
+
+    // ── Footer Totals ──
+    doc.setFillColor(248, 246, 255);
+    doc.roundedRect(pageW - 80, finalY, 66, showGst ? 28 : 20, 2, 2, 'F');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+    
+    if (showGst) {
+      doc.text('Total Freight:', pageW - 78, finalY + 7);
+      doc.text(`₹${totalFreight.toLocaleString('en-IN')}`, pageW - 16, finalY + 7, { align: 'right' });
+      doc.text('Total GST:', pageW - 78, finalY + 13);
+      doc.text(`₹${totalGst.toLocaleString('en-IN')}`, pageW - 16, finalY + 13, { align: 'right' });
+      doc.setDrawColor(139, 92, 246); doc.setLineWidth(0.3);
+      doc.line(pageW - 78, finalY + 15, pageW - 16, finalY + 15);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
+      doc.text('Grand Total:', pageW - 78, finalY + 22);
+      doc.setTextColor(139, 92, 246);
+      doc.text(`₹${grandTotal.toLocaleString('en-IN')}`, pageW - 16, finalY + 22, { align: 'right' });
+    } else {
+      doc.text('Total Freight:', pageW - 78, finalY + 7);
+      doc.text(`₹${totalFreight.toLocaleString('en-IN')}`, pageW - 16, finalY + 7, { align: 'right' });
+      doc.setDrawColor(139, 92, 246); doc.setLineWidth(0.3);
+      doc.line(pageW - 78, finalY + 9, pageW - 16, finalY + 9);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
+      doc.text('Grand Total:', pageW - 78, finalY + 15);
+      doc.setTextColor(139, 92, 246);
+      doc.text(`₹${grandTotal.toLocaleString('en-IN')}`, pageW - 16, finalY + 15, { align: 'right' });
+    }
+
+    // ── Terms ──
+    const terms = pdfParty.terms || '15 days';
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
+    doc.text(`Payment Terms: Please make payment within ${terms}.`, 14, finalY + 35);
+    doc.text('This is a computer generated statement.', 14, finalY + 40);
+
+    // ── Save ──
+    const monthName = MONTH_NAMES[fromDate.getMonth()];
+    const year = fromDate.getFullYear();
+    const safeName = coName.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
+    doc.save(`${safeName}_${monthName}${year}.pdf`);
+    setPdfParty(null);
+  };
+
+  const BillAsDropdown = ({ partyId, currentType, onChange }) => (
+    <div style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--bg-panel)', border: '1px solid var(--border)', borderRadius: '6px', overflow: 'hidden', fontSize: '11px', padding: '2px 4px' }} onClick={e => e.stopPropagation()}>
+      <span style={{ color: 'var(--text-muted)', padding: '0 4px', fontWeight: 600 }}>Bill As:</span>
+      <select value={currentType || 'nonGst'} onChange={(e) => onChange(partyId, e.target.value)} style={{ background: 'transparent', border: 'none', fontSize: '11px', fontWeight: 700, color: currentType === 'gst' ? 'var(--accent)' : 'var(--text-main)', cursor: 'pointer', outline: 'none' }}>
+        <option value="gst">{companyProfiles?.gst?.name || 'Vijay Roadlines'} (GST)</option>
+        <option value="nonGst">{companyProfiles?.nonGst?.name || 'Vijay Transport'} (Non-GST)</option>
+      </select>
+    </div>
+  );
+
   const renderPartyCard = (party) => (
     <div key={party.id} className="data-card" onClick={() => setActiveParty(party)} style={{ position: 'relative' }}>
-      <div className="dc-header" style={{ position: 'relative' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div className="dc-header" style={{ position: 'relative', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <div className="dc-title">{party.name}</div>
           <div className="dc-badge">{party.type || 'Client'}</div>
         </div>
@@ -163,6 +371,10 @@ export default function Parties({ data, refreshData }) {
           <div className="dc-val" style={{ fontWeight: 600, color: 'var(--accent)' }}>{party.gst}</div>
         </div>
       )}
+
+      <div style={{ marginTop: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+        <BillAsDropdown partyId={party.id} currentType={partyBilling[party.id]} onChange={updatePartyBilling} />
+      </div>
       
       {/* Click overlay indicator */}
       <div style={{ position: 'absolute', bottom: '16px', right: '16px', color: 'var(--accent)', fontSize: '12px', fontWeight: 600, opacity: 0.8 }}>
@@ -223,13 +435,18 @@ export default function Parties({ data, refreshData }) {
             <div className="detail-header" style={{ alignItems: 'center' }}>
               <div>
                 <div className="detail-title">{activeParty.name}</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                  {activeParty.type} {activeParty.gst ? `· GST: ${activeParty.gst}` : ''}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                    {activeParty.type} {activeParty.gst ? `· GST: ${activeParty.gst}` : ''}
+                  </div>
+                  <BillAsDropdown partyId={activeParty.id} currentType={partyBilling[activeParty.id]} onChange={updatePartyBilling} />
                 </div>
               </div>
               <div className="detail-actions">
                 <button className="btn btn-sm btn-ghost" onClick={(e) => openEditModal(e, activeParty)}>Edit</button>
                 <button className="btn btn-sm btn-danger" onClick={(e) => handleDelete(e, activeParty.id)}>Delete</button>
+                <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', fontWeight: 700 }}
+                  onClick={() => { setPdfParty(activeParty); setPdfFrom(''); setPdfTo(''); }}>📄 Generate Statement</button>
                 <button className="modal-close" onClick={() => setActiveParty(null)} style={{ marginLeft: '12px' }}>&times;</button>
               </div>
             </div>
@@ -378,6 +595,40 @@ export default function Parties({ data, refreshData }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Date Range Modal */}
+      {pdfParty && (
+        <div className="modal-overlay active" style={{ zIndex: 1100 }}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <div className="modal-title">📄 Generate Statement</div>
+              <button className="modal-close" onClick={() => setPdfParty(null)}>&times;</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>
+                Generate a PDF freight statement for <strong>{pdfParty.name}</strong>.
+                Only freight &amp; GST will be shown — no diesel or toll costs.
+              </p>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">From Date</label>
+                  <input type="date" className="form-input" value={pdfFrom} onChange={e => setPdfFrom(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">To Date</label>
+                  <input type="date" className="form-input" value={pdfTo} onChange={e => setPdfTo(e.target.value)} />
+                </div>
+              </div>
+              <div className="form-actions">
+                <button className="btn btn-ghost" onClick={() => setPdfParty(null)}>Cancel</button>
+                <button className="btn btn-primary" style={{ background: '#16a34a' }} onClick={handleGeneratePDF}>
+                  ⬇ Download PDF
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

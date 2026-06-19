@@ -228,6 +228,43 @@ app.delete('/api/advances/:id', (req, res) => {
     });
 });
 
+// --- OVERHEADS ---
+app.get('/api/overheads', (req, res) => {
+    db.all(`SELECT * FROM overheads ORDER BY date DESC`, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.post('/api/overheads', (req, res) => {
+    const { date, category, amount, notes } = req.body;
+    const id = req.body.id || generateId();
+    db.run(`INSERT INTO overheads (id, date, category, amount, notes) VALUES (?, ?, ?, ?, ?)`,
+        [id, date, category, amount, notes],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id, date, category, amount, notes });
+        });
+});
+
+app.put('/api/overheads/:id', (req, res) => {
+    const { date, category, amount, notes } = req.body;
+    db.run(`UPDATE overheads SET date=?, category=?, amount=?, notes=? WHERE id=?`,
+        [date, category, amount, notes, req.params.id],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id: req.params.id, date, category, amount, notes });
+        });
+});
+
+app.delete('/api/overheads/:id', (req, res) => {
+    db.run(`DELETE FROM overheads WHERE id=?`, req.params.id, function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ deleted: this.changes > 0 });
+    });
+});
+
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });
