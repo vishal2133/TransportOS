@@ -90,6 +90,19 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 amount REAL NOT NULL,
                 notes TEXT
             )`);
+
+            // Insurance
+            db.run(`CREATE TABLE IF NOT EXISTS insurance (
+                id TEXT PRIMARY KEY,
+                truckId TEXT NOT NULL,
+                insurer TEXT,
+                policyNumber TEXT,
+                startDate TEXT,
+                expiryDate TEXT NOT NULL,
+                premium REAL DEFAULT 0,
+                notes TEXT,
+                policyFile TEXT
+            )`);
         });
     }
 });

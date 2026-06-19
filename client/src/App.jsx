@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Map, Truck, Users, Building2, FileText, Receipt, Settings } from 'lucide-react';
+import { LayoutDashboard, Map, Truck, Users, Building2, FileText, Receipt, Shield, Settings } from 'lucide-react';
 import { api } from './api';
 
 // Pages
@@ -10,6 +10,7 @@ import Trucks from './pages/Trucks';
 import Drivers from './pages/Drivers';
 import Parties from './pages/Parties';
 import Documents from './pages/Documents';
+import Insurance from './pages/Insurance';
 import Overheads from './pages/Overheads';
 
 // ── Company Settings (localStorage) ──────────────────────────────────────────
@@ -123,7 +124,7 @@ function CompanySetupModal({ companyProfiles, onSave, onClose }) {
 
 function App() {
   const [data, setData] = useState({
-    trucks: [], drivers: [], parties: [], trips: [], documents: [], overheads: [],
+    trucks: [], drivers: [], parties: [], trips: [], documents: [], overheads: [], insurance: [],
   });
   const [loading, setLoading] = useState(true);
   const [companyProfiles, setCompanyProfiles] = useState(loadCompanyProfiles);
@@ -132,15 +133,16 @@ function App() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [trucks, drivers, parties, trips, documents, overheads] = await Promise.all([
+      const [trucks, drivers, parties, trips, documents, overheads, insurance] = await Promise.all([
         api.getTrucks(),
         api.getDrivers(),
         api.getParties(),
         api.getTrips(),
         api.getDocuments(),
         api.getOverheads(),
+        api.getInsurance(),
       ]);
-      setData({ trucks, drivers, parties, trips, documents, overheads });
+      setData({ trucks, drivers, parties, trips, documents, overheads, insurance });
     } catch (err) {
       console.error('Failed to fetch data', err);
     } finally {
@@ -194,6 +196,9 @@ function App() {
             <NavLink to="/documents" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <span className="nav-icon"><FileText size={18} /></span> Documents
             </NavLink>
+            <NavLink to="/insurance" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+              <span className="nav-icon"><Shield size={18} /></span> Insurance
+            </NavLink>
             <NavLink to="/overheads" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
               <span className="nav-icon"><Receipt size={18} /></span> Overheads
             </NavLink>
@@ -218,6 +223,7 @@ function App() {
               <Route path="/drivers" element={<Drivers data={data} refreshData={refreshData} />} />
               <Route path="/parties" element={<Parties data={data} refreshData={refreshData} companyProfiles={companyProfiles} />} />
               <Route path="/documents" element={<Documents data={data} refreshData={refreshData} />} />
+              <Route path="/insurance" element={<Insurance data={data} refreshData={refreshData} />} />
               <Route path="/overheads" element={<Overheads data={data} refreshData={refreshData} />} />
             </Routes>
           )}

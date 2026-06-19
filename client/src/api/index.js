@@ -36,5 +36,13 @@ export const api = {
   addOverhead: (data) => fetch(`${API_BASE}/overheads`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(res => res.json()),
   updateOverhead: (id, data) => fetch(`${API_BASE}/overheads/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(res => res.json()),
   deleteOverhead: (id) => fetch(`${API_BASE}/overheads/${id}`, { method: 'DELETE' }).then(res => res.json()),
+
+  // Insurance
+  getInsurance: () => fetch(`${API_BASE}/insurance`).then(res => res.json()),
+  addInsurance: (data) => fetch(`${API_BASE}/insurance`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(res => res.json()),
+  updateInsurance: (id, data) => fetch(`${API_BASE}/insurance/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }).then(res => res.json()),
+  deleteInsurance: (id) => fetch(`${API_BASE}/insurance/${id}`, { method: 'DELETE' }).then(res => res.json()),
+  getInsuranceFile: (id) => fetch(`${API_BASE}/insurance/${id}/file`).then(res => res.json()),
+  uploadInsuranceFile: (id, fileBase64) => fetch(`${API_BASE}/insurance/${id}/file`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: fileBase64 }) }).then(res => res.json()),
 };
 

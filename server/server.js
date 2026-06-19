@@ -265,6 +265,62 @@ app.delete('/api/overheads/:id', (req, res) => {
 });
 
 
+// --- INSURANCE ---
+app.get('/api/insurance', (req, res) => {
+    db.all(`SELECT id, truckId, insurer, policyNumber, startDate, expiryDate, premium, notes, CASE WHEN policyFile IS NOT NULL THEN 1 ELSE 0 END as hasFile FROM insurance ORDER BY expiryDate ASC`, [], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+app.post('/api/insurance', (req, res) => {
+    const { truckId, insurer, policyNumber, startDate, expiryDate, premium, notes } = req.body;
+    const id = req.body.id || generateId();
+    db.run(`INSERT INTO insurance (id, truckId, insurer, policyNumber, startDate, expiryDate, premium, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, truckId, insurer, policyNumber, startDate, expiryDate, premium || 0, notes],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id, truckId, insurer, policyNumber, startDate, expiryDate, premium, notes, hasFile: 0 });
+        });
+});
+
+app.put('/api/insurance/:id', (req, res) => {
+    const { truckId, insurer, policyNumber, startDate, expiryDate, premium, notes } = req.body;
+    db.run(`UPDATE insurance SET truckId=?, insurer=?, policyNumber=?, startDate=?, expiryDate=?, premium=?, notes=? WHERE id=?`,
+        [truckId, insurer, policyNumber, startDate, expiryDate, premium || 0, notes, req.params.id],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id: req.params.id, truckId, insurer, policyNumber, startDate, expiryDate, premium, notes });
+        });
+});
+
+app.delete('/api/insurance/:id', (req, res) => {
+    db.run(`DELETE FROM insurance WHERE id=?`, req.params.id, function(err) {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ deleted: this.changes > 0 });
+    });
+});
+
+// File upload / fetch endpoints for Insurance
+app.get('/api/insurance/:id/file', (req, res) => {
+    db.get(`SELECT policyFile FROM insurance WHERE id=?`, [req.params.id], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row || !row.policyFile) return res.status(404).json({ error: 'File not found' });
+        res.json({ file: row.policyFile });
+    });
+});
+
+app.put('/api/insurance/:id/file', (req, res) => {
+    const { file } = req.body; // Expecting Base64 string
+    db.run(`UPDATE insurance SET policyFile=? WHERE id=?`,
+        [file, req.params.id],
+        function(err) {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, hasFile: 1 });
+        });
+});
+
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });

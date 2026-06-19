@@ -305,6 +305,8 @@ export default function Parties({ data, refreshData, companyProfiles }) {
     });
 
     // ── Footer Totals & Extra ──
+    const finalY = doc.lastAutoTable.finalY + 6;
+
     if (showGst) {
       doc.setDrawColor(139, 92, 246); doc.setLineWidth(0.3);
       const footerH = 38;
@@ -409,8 +411,8 @@ export default function Parties({ data, refreshData, companyProfiles }) {
     // ── Save ──
     const monthName = MONTH_NAMES[fromDate.getMonth()];
     const year = fromDate.getFullYear();
-    const safeName = coName.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
-    doc.save(`${safeName}_${monthName}${year}.pdf`);
+    const safeName = pdfParty.name.replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_');
+    doc.save(`${safeName}_${monthName}_${year}.pdf`);
     setPdfParty(null);
   };
 
