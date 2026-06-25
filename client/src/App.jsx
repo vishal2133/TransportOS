@@ -44,6 +44,20 @@ function CompanySetupModal({ companyProfiles, onSave, onClose }) {
     });
   };
 
+  const handleSignatureUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setForm({
+          ...form,
+          [activeTab]: { ...form[activeTab], signature: event.target.result }
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="modal-overlay active" style={{ zIndex: 2000 }}>
       <div className="modal" style={{ maxWidth: 480 }}>
@@ -105,6 +119,16 @@ function CompanySetupModal({ companyProfiles, onSave, onClose }) {
             <div className="form-group">
               <label className="form-label">IFSC Code</label>
               <input name="bankIfsc" value={form[activeTab].bankIfsc || ''} onChange={handle} className="form-input" placeholder="e.g. ICIC0007686" />
+            </div>
+            <div className="form-group full-width" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+              <label className="form-label" style={{ color: 'var(--accent)', fontWeight: 700 }}>Signature Stamp (for PDF)</label>
+              <input type="file" accept="image/*" onChange={handleSignatureUpload} className="form-input" />
+              {form[activeTab].signature && (
+                <div style={{ marginTop: '8px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+                  <img src={form[activeTab].signature} alt="Signature" style={{ maxHeight: '60px', border: '1px solid var(--border)', borderRadius: '4px' }} />
+                  <button type="button" className="btn btn-sm btn-ghost" onClick={() => setForm({ ...form, [activeTab]: { ...form[activeTab], signature: null } })} style={{ color: 'var(--red)' }}>Remove</button>
+                </div>
+              )}
             </div>
           </div>
           <div className="form-actions" style={{ marginTop: '24px' }}>

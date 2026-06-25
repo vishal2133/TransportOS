@@ -321,6 +321,62 @@ app.put('/api/insurance/:id/file', (req, res) => {
 });
 
 
+// --- BILL SEQUENCES ---
+app.post('/api/bills/next', (req, res) => {
+    const { companyType, billNumber } = req.body;
+    if (!companyType) return res.status(400).json({ error: 'companyType required' });
+    if (!billNumber) return res.status(400).json({ error: 'billNumber required' });
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-11
+    
+    // Financial year is April 1st to March 31st
+    let financialYear = '';
+    if (month < 3) { // Jan, Feb, Mar
+        financialYear = `${year - 1}-${year}`;
+    } else {
+        financialYear = `${year}-${year + 1}`;
+    }
+
+    db.get(`SELECT lastNumber FROM bill_sequences WHERE companyType = ? AND financialYear = ?`, [companyType, financialYear], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        if (row) {
+            db.run(`UPDATE bill_sequences SET lastNumber = ? WHERE companyType = ? AND financialYear = ?`, [billNumber, companyType, financialYear], function(err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ billNumber, financialYear });
+            });
+        } else {
+            db.run(`INSERT INTO bill_sequences (companyType, financialYear, lastNumber) VALUES (?, ?, ?)`, [companyType, financialYear, billNumber], function(err) {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ billNumber, financialYear });
+            });
+        }
+    });
+});
+
+app.get('/api/bills/last', (req, res) => {
+    const { companyType } = req.query;
+    if (!companyType) return res.status(400).json({ error: 'companyType required' });
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    
+    let financialYear = '';
+    if (month < 3) {
+        financialYear = `${year - 1}-${year}`;
+    } else {
+        financialYear = `${year}-${year + 1}`;
+    }
+
+    db.get(`SELECT lastNumber FROM bill_sequences WHERE companyType = ? AND financialYear = ?`, [companyType, financialYear], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ lastNumber: row ? row.lastNumber : 0, financialYear });
+    });
+});
+
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
 });

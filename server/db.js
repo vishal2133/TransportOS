@@ -103,6 +103,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
                 notes TEXT,
                 policyFile TEXT
             )`);
+
+            // Bill Sequences
+            db.run(`CREATE TABLE IF NOT EXISTS bill_sequences (
+                companyType TEXT,
+                financialYear TEXT,
+                lastNumber INTEGER DEFAULT 0,
+                PRIMARY KEY (companyType, financialYear)
+            )`);
         });
     }
 });

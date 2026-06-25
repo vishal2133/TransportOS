@@ -44,5 +44,9 @@ export const api = {
   deleteInsurance: (id) => fetch(`${API_BASE}/insurance/${id}`, { method: 'DELETE' }).then(res => res.json()),
   getInsuranceFile: (id) => fetch(`${API_BASE}/insurance/${id}/file`).then(res => res.json()),
   uploadInsuranceFile: (id, fileBase64) => fetch(`${API_BASE}/insurance/${id}/file`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: fileBase64 }) }).then(res => res.json()),
+
+  // Bill Sequences
+  generateBillNumber: (companyType, billNumber) => fetch(`${API_BASE}/bills/next`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ companyType, billNumber }) }).then(res => res.json()),
+  getLastBillNumber: (companyType) => fetch(`${API_BASE}/bills/last?companyType=${companyType}`).then(res => res.json()),
 };
 

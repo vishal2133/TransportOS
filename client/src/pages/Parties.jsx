@@ -41,6 +41,9 @@ export default function Parties({ data, refreshData, companyProfiles }) {
   const [pdfTo, setPdfTo] = useState('');
   const [pdfTaxType, setPdfTaxType] = useState('cgst_sgst'); // 'cgst_sgst' or 'igst'
   const [pdfPayableBy, setPdfPayableBy] = useState('consignor'); // 'consignor', 'consignee', 'transporter'
+  const [pdfMode, setPdfMode] = useState('bill'); // 'bill' or 'record'
+  const [manualBillNumber, setManualBillNumber] = useState('');
+  const [lastBillNumber, setLastBillNumber] = useState(null);
 
   // ── Ledger / Detail Panel State ──
   const [activeParty, setActiveParty] = useState(null);
@@ -187,7 +190,7 @@ export default function Parties({ data, refreshData, companyProfiles }) {
   };
 
   // ── PDF Generation ──
-  const handleGeneratePDF = () => {
+  const handleGeneratePDF = async () => {
     if (!pdfFrom || !pdfTo) { alert('Please select both From and To dates.'); return; }
     const trips = (data.trips || []).filter(t => t.partyId === pdfParty.id && t.date >= pdfFrom && t.date <= pdfTo)
       .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -218,23 +221,60 @@ export default function Parties({ data, refreshData, companyProfiles }) {
     doc.setLineWidth(0.8);
     doc.line(14, 33, pageW - 14, 33);
 
+    // ── Generate Bill Number ──
+    let billInfo = { billNumber: null, financialYear: '' };
+    if (pdfMode === 'bill') {
+      try {
+        billInfo = await api.generateBillNumber(billingType, manualBillNumber);
+      } catch (err) {
+        console.error("Failed to generate bill number", err);
+      }
+    }
+
     // ── Title ──
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
     doc.setTextColor(30, 30, 30);
-    doc.text('FREIGHT STATEMENT', pageW / 2, 40, { align: 'center' });
+    doc.text('BILL INVOICE', pageW / 2, 40, { align: 'center' });
+
+    // ── Bill No & FY (Top Right) ──
+    if (billInfo.billNumber) {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(220, 38, 38);
+      doc.text(`Bill No: ${billInfo.billNumber}`, pageW - 14, 43, { align: 'right' });
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      doc.text(`FY: ${billInfo.financialYear}`, pageW - 14, 48, { align: 'right' });
+    }
 
     // ── Party & Date info ──
     const fromDate = new Date(pdfFrom + 'T00:00:00');
     const toDate = new Date(pdfTo + 'T00:00:00');
     const fmtD = (d) => d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    
     doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(30, 30, 30);
+    doc.text(`To: ${pdfParty.name}`, 14, 48);
+    
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
-    doc.text(`To: ${pdfParty.name}`, 14, 48);
-    if (pdfParty.gst) doc.text(`GST: ${pdfParty.gst}`, 14, 53);
-    doc.text(`Period: ${fmtD(fromDate)} — ${fmtD(toDate)}`, pageW - 14, 48, { align: 'right' });
-    doc.text(`Generated: ${fmtD(new Date())}`, pageW - 14, 53, { align: 'right' });
+    let yParty = 53;
+    if (pdfParty.address && pdfParty.address.trim() !== '') {
+      // split address if it's too long, but we'll assume it fits in one line for now
+      doc.text(pdfParty.address, 14, yParty);
+      yParty += 5;
+    }
+    if (pdfParty.gst && pdfParty.gst.trim() !== '') {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`GSTIN - ${pdfParty.gst}`, 14, yParty);
+      doc.setFont('helvetica', 'normal');
+    }
+
+    doc.text(`Period: ${fmtD(fromDate)} — ${fmtD(toDate)}`, pageW - 14, 53, { align: 'right' });
+    doc.text(`Date - ${fmtD(new Date())}`, pageW - 14, 58, { align: 'right' });
 
     // ── Table ──
     const showGst = billingType === 'gst';
@@ -293,7 +333,7 @@ export default function Parties({ data, refreshData, companyProfiles }) {
       };
 
     autoTable(doc, {
-      startY: 58,
+      startY: Math.max(62, yParty + 4),
       head: headRow,
       body: rows,
       theme: 'grid',
@@ -369,6 +409,15 @@ export default function Parties({ data, refreshData, companyProfiles }) {
       doc.text(`GSTIN: ${co.gstin || ''}`, 16, finalY + 35);
       doc.text(`For ${co.name ? co.name.toUpperCase() : 'COMPANY'}`, pageW - 16, finalY + 35, { align: 'right' });
       
+      if (co.signature) {
+        // Draw the uploaded stamp (35mm x 15mm)
+        try {
+          doc.addImage(co.signature, 'PNG', pageW - 51, finalY + 38, 35, 15);
+        } catch (e) {
+          console.error("Failed to add signature image to PDF:", e);
+        }
+      }
+      
     } else {
       doc.setFillColor(248, 246, 255);
       doc.roundedRect(pageW - 80, finalY, 66, 20, 2, 2, 'F');
@@ -384,14 +433,6 @@ export default function Parties({ data, refreshData, companyProfiles }) {
       doc.text(`Rs. ${grandTotal.toLocaleString('en-IN')}`, pageW - 16, finalY + 15, { align: 'right' });
 
       let yOffset = finalY + 26;
-      if (co.bankName) {
-        doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(30, 30, 30);
-        doc.text('Bank Details:', 14, yOffset);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`${co.bankName}, ${co.bankBranch}`, 14, yOffset + 5);
-        doc.text(`A/C: ${co.bankAccount}  |  IFSC: ${co.bankIfsc}`, 14, yOffset + 10);
-        yOffset += 18;
-      }
 
       doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(30, 30, 30);
       doc.text('GST Payable by', 14, yOffset);
@@ -400,13 +441,23 @@ export default function Parties({ data, refreshData, companyProfiles }) {
       doc.text(`Consignor  [ ${pdfPayableBy === 'consignor' ? 'X' : ' '} ]`, 14, yOffset + 7);
       doc.text(`Consignee  [ ${pdfPayableBy === 'consignee' ? 'X' : ' '} ]`, 54, yOffset + 7);
       doc.text(`Transporter  [ ${pdfPayableBy === 'transporter' ? 'X' : ' '} ]`, 94, yOffset + 7);
+      
+      // Signatory for Non-GST
+      doc.setFontSize(10); doc.setTextColor(220, 38, 38);
+      doc.text(`For ${co.name ? co.name.toUpperCase() : 'COMPANY'}`, pageW - 16, finalY + 35, { align: 'right' });
+      if (co.signature) {
+        try {
+          doc.addImage(co.signature, 'PNG', pageW - 51, finalY + 38, 35, 15);
+        } catch (e) { console.error(e); }
+      }
     }
 
     // ── Terms ──
     const terms = pdfParty.terms || '15 days';
     doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(120, 120, 120);
-    doc.text(`Payment Terms: Please make payment within ${terms}.`, 14, finalY + 35);
-    doc.text('This is a computer generated statement.', 14, finalY + 40);
+    const termsY = (showGst && co.signature) ? finalY + 60 : finalY + 45;
+    doc.text(`Payment Terms: Please make payment within ${terms}.`, 14, termsY);
+    doc.text('This is a computer generated statement.', 14, termsY + 5);
 
     // ── Save ──
     const monthName = MONTH_NAMES[fromDate.getMonth()];
@@ -529,7 +580,15 @@ export default function Parties({ data, refreshData, companyProfiles }) {
                 <button className="btn btn-sm btn-ghost" onClick={(e) => openEditModal(e, activeParty)}>Edit</button>
                 <button className="btn btn-sm btn-danger" onClick={(e) => handleDelete(e, activeParty.id)}>Delete</button>
                 <button className="btn btn-sm" style={{ background: '#16a34a', color: '#fff', fontWeight: 700 }}
-                  onClick={() => { setPdfParty(activeParty); setPdfFrom(''); setPdfTo(''); }}>📄 Generate Statement</button>
+                  onClick={async () => { 
+                    setPdfParty(activeParty); setPdfFrom(''); setPdfTo(''); 
+                    setPdfMode('bill'); setManualBillNumber(''); setLastBillNumber(null);
+                    const billingType = partyBilling[activeParty.id] || ((activeParty.gst && activeParty.gst.trim() !== '') ? 'gst' : 'nonGst');
+                    try {
+                      const res = await api.getLastBillNumber(billingType);
+                      setLastBillNumber(res.lastNumber);
+                    } catch(e) { console.error(e); }
+                  }}>📄 Generate Statement</button>
                 <button className="modal-close" onClick={() => setActiveParty(null)} style={{ marginLeft: '12px' }}>&times;</button>
               </div>
             </div>
@@ -691,9 +750,32 @@ export default function Parties({ data, refreshData, companyProfiles }) {
               <button className="modal-close" onClick={() => setPdfParty(null)}>&times;</button>
             </div>
             <div className="modal-body">
+              <div style={{ marginBottom: '16px', padding: '12px', background: 'var(--bg-panel)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                <label className="form-label" style={{ marginBottom: '8px' }}>What would you like to generate?</label>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                    <input type="radio" name="pdfMode" checked={pdfMode === 'bill'} onChange={() => setPdfMode('bill')} />
+                    BILL (with Bill Number)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
+                    <input type="radio" name="pdfMode" checked={pdfMode === 'record'} onChange={() => setPdfMode('record')} />
+                    RECORD (Internal, no Bill Number)
+                  </label>
+                </div>
+              </div>
+
+              {pdfMode === 'bill' && (
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Enter Bill Number *</span>
+                    <span style={{ color: 'var(--text-muted)' }}>Last used: <strong style={{ color: 'var(--accent)' }}>{lastBillNumber !== null ? lastBillNumber : 'Loading...'}</strong></span>
+                  </label>
+                  <input type="number" className="form-input" value={manualBillNumber} onChange={e => setManualBillNumber(e.target.value)} placeholder="e.g. 48" />
+                </div>
+              )}
+              
               <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>
                 Generate a PDF freight statement for <strong>{pdfParty.name}</strong>.
-                Only freight &amp; GST will be shown — no diesel or toll costs.
               </p>
               <div className="form-grid">
                 <div className="form-group">
